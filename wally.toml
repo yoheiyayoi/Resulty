@@ -4,7 +4,8 @@ description = "⚡ Type-safe error handling for Luau"
 version = "1.0.0"
 license = "MIT"
 authors = ["yohei_yayoi"]
-registry = "https://github.com/yoheiyayoi/Resulty/"
+registry = "https://github.com/UpliftGames/wally-index"
+repository = "https://github.com/yoheiyayoi/Resulty"
 realm = "shared"
 include = [
     "src",
