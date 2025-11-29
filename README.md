@@ -1,402 +1,225 @@
-# Resulty ⚡
+# Resulty
 
-A **type-safe Result type implementation** for Luau, inspired by Rust's `Result<T, E>`.
+Rust-style Result type for Luau. No more `pcall` spaghetti.
 
-Handle operations that can succeed or fail without relying on exceptions or messy `pcall` patterns.
+## Why?
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+Ever get tired of writing this?
 
-## ✨ Features
+```luau
+local ok, result = pcall(function()
+    return something:ThatMightFail()
+end)
 
-- **Type-safe error handling** with explicit success/failure states
-- **Chainable operations** with `map`, `andThen`, `orElse`
-- **Pattern matching** support via `match()`
-- **Better alternative to pcall** with preserved type information
-- **Promise-like chaining** without callback hell (synchronous)
+if ok then
+    -- do stuff
+else
+    -- handle error
+end
+```
 
-## 📦 Installation
+Yeah, me too. This gives you proper error handling that you can actually chain together.
 
-### Wally
+## Install
 
-Add to your `wally.toml`:
-
+**Wally:**
 ```toml
 [dependencies]
 Resulty = "yohei_yayoi/resulty@1.0.0"
 ```
 
-### Manual
+Or just grab `src/init.luau` and drop it in your project.
 
-Copy `src/init.luau` into your project.
-
----
-
-## 🚀 Quick Start
+## Quick Example
 
 ```luau
 local Resulty = require(path.to.Resulty)
 
--- Wrap a potentially dangerous operation
 local result = Resulty.try(function()
-    return someDangerousOperation()
+    return somethingRisky()
 end)
 
--- Handle the result with pattern matching
 result:match({
-    Ok = function(value) print("Success:", value) end,
-    Err = function(err) warn("Failed:", err) end,
+    Ok = function(value) print("got:", value) end,
+    Err = function(err) warn("oops:", err) end,
 })
 ```
 
----
+## API
 
-## 📖 API Reference
+### Making Results
 
-### Creating Results
-
-#### `Resulty.Ok(value)`
-Creates a successful Result containing the given value.
-
+**`Resulty.Ok(value)`** - wrap a success value
 ```luau
-local success = Resulty.Ok("Hello!")
-print(success:unwrap()) -- "Hello!"
+local good = Resulty.Ok("nice")
 ```
 
-#### `Resulty.Err(error)`
-Creates a failed Result containing the given error.
-
+**`Resulty.Err(error)`** - wrap an error
 ```luau
-local failure = Resulty.Err("Something went wrong")
-print(failure:isErr()) -- true
+local bad = Resulty.Err("something broke")
 ```
 
-#### `Resulty.try(fn, ...)`
-Wraps a function call with automatic error handling using `pcall`. Unlike raw pcall, this preserves type information and allows chaining.
-
+**`Resulty.try(fn, ...)`** - pcall but better
 ```luau
 local result = Resulty.try(function()
-    return game.Workspace:FindFirstChild("Part").Name
+    return workspace:FindFirstChild("Part").Name
 end)
--- If Part doesn't exist, result will be Err instead of throwing
 ```
 
-#### `Resulty.tryWith(context, fn, ...)`
-Like `try()`, but prepends a context string to any error message.
-
+**`Resulty.tryWith(context, fn, ...)`** - same as try but adds context to errors
 ```luau
-local result = Resulty.tryWith("Loading player data", function()
+local result = Resulty.tryWith("loading data", function()
     return DataStore:GetAsync(key)
 end)
--- Error: "Loading player data: DataStore request failed"
+-- if it fails: "loading data: [actual error]"
 ```
 
-#### `Resulty.validate(value, validator, errorMsg?)`
-Validates a value using a predicate function.
-
+**`Resulty.validate(value, check, errMsg?)`** - validate something
 ```luau
-local result = Resulty.validate(age, function(v) return v >= 18 end, "Must be 18+")
+local result = Resulty.validate(age, function(v) return v >= 18 end, "too young")
 ```
 
----
+### Combining Results
 
-### Combining Multiple Results
-
-#### `Resulty.all(results)`
-Combines multiple Results into one. Returns `Ok` with all values if all succeed, or `Err` with the first failure.
-
+**`Resulty.all(results)`** - all must succeed, returns array of values
 ```luau
-local results = Resulty.all({
+local all = Resulty.all({
     Resulty.Ok(1),
     Resulty.Ok(2),
-    Resulty.Ok(3),
 })
--- Ok({1, 2, 3})
+-- Ok({1, 2})
 ```
 
-#### `Resulty.any(results)`
-Returns the first successful Result, or the last error if all fail.
-
+**`Resulty.any(results)`** - returns first success
 ```luau
-local result = Resulty.any({
-    Resulty.Err("Failed 1"),
-    Resulty.Ok("Success!"),
-    Resulty.Err("Failed 2"),
+local first = Resulty.any({
+    Resulty.Err("nope"),
+    Resulty.Ok("this one"),
 })
--- Ok("Success!")
 ```
 
----
+### Checking
 
-### Checking State
+**`:isOk()`** / **`:isErr()`** - what it sounds like
 
-#### `:isOk()`
-Returns `true` if the Result is successful.
+### Getting Values Out
 
+**`:unwrap()`** - get the value or explode
 ```luau
-if result:isOk() then
-    print("It worked!")
-end
+local val = result:unwrap() -- errors if result is Err!
 ```
 
-#### `:isErr()`
-Returns `true` if the Result is an error.
-
-```luau
-if result:isErr() then
-    warn("Something failed")
-end
-```
-
----
-
-### Extracting Values
-
-#### `:unwrap()`
-Extracts the success value. **Throws an error** if the Result is `Err`.
-
-```luau
-local value = result:unwrap() -- ⚠️ Will error if result is Err!
-```
-
-#### `:unwrapOr(default)`
-Returns the success value, or the provided default if `Err`.
-
+**`:unwrapOr(default)`** - get the value or use fallback
 ```luau
 local name = result:unwrapOr("Unknown")
 ```
 
-#### `:unwrapOrElse(fn)`
-Returns the success value, or computes a default using the provided function (lazy evaluation).
-
+**`:unwrapOrElse(fn)`** - get the value or compute fallback
 ```luau
-local value = result:unwrapOrElse(function(err)
-    warn("Error occurred:", err)
-    return getDefaultValue()
+local val = result:unwrapOrElse(function(err)
+    warn(err)
+    return getFallback()
 end)
 ```
 
-#### `:ok()`
-Returns the success value, or `nil` if `Err`.
-
-```luau
-local maybeValue = result:ok()
-```
-
-#### `:err()`
-Returns the error value, or `nil` if `Ok`.
-
-```luau
-local maybeError = result:err()
-```
-
----
+**`:ok()`** / **`:err()`** - returns value/error or nil
 
 ### Pattern Matching
 
-#### `:match(handlers)`
-Pattern matches on the Result, calling the appropriate handler. Provides exhaustive checking similar to Rust's `match` expression.
-
+**`:match(handlers)`** - handle both cases
 ```luau
-local message = result:match({
-    Ok = function(value)
-        return "Got: " .. tostring(value)
-    end,
-    Err = function(err)
-        return "Error: " .. tostring(err)
-    end,
+result:match({
+    Ok = function(v) return "got " .. v end,
+    Err = function(e) return "failed: " .. e end,
 })
 ```
 
----
+### Transforming
 
-### Transforming Values
-
-#### `:map(fn)`
-Transforms the success value using the provided function. If `Err`, returns self unchanged.
-
+**`:map(fn)`** - transform success value
 ```luau
-local doubled = Resulty.Ok(5):map(function(n) return n * 2 end)
--- Ok(10)
+Resulty.Ok(5):map(function(n) return n * 2 end) -- Ok(10)
 ```
 
-#### `:mapErr(fn)`
-Transforms the error value. If `Ok`, returns self unchanged.
+**`:mapErr(fn)`** - transform error value
 
+**`:filter(predicate, errMsg?)`** - keep value if predicate passes
 ```luau
-local detailed = result:mapErr(function(err)
-    return { code = 500, message = err }
-end)
+Resulty.Ok(5):filter(function(n) return n % 2 == 0 end, "not even")
+-- Err("not even")
 ```
 
-#### `:filter(predicate, errorMsg?)`
-Filters the success value using a predicate. Returns `Err` if the predicate fails.
+### Chaining
 
+**`:andThen(fn)`** - chain operations (fn must return a Result)
 ```luau
-local evenOnly = Resulty.Ok(5):filter(function(n) return n % 2 == 0 end, "Must be even")
--- Err("Must be even")
-```
-
----
-
-### Chaining Operations
-
-#### `:andThen(fn)`
-Chains another Result-returning operation on success. Enables flat-mapping without nested Results (monadic bind).
-
-```luau
-local result = Resulty.Ok(userId)
+Resulty.Ok(userId)
     :andThen(function(id)
         return Resulty.try(function()
             return DataStore:GetAsync(id)
         end)
     end)
-    :andThen(function(data)
-        return Resulty.validate(data, isValid, "Invalid data")
-    end)
 ```
 
-#### `:orElse(fn)`
-Provides an alternative Result if this one is `Err`. Enables recovery from errors with retry logic.
-
+**`:orElse(fn)`** - try recovery on error
 ```luau
-local result = fetchFromPrimary()
+fetchPrimary()
     :orElse(function(err)
-        warn("Primary failed:", err)
-        return fetchFromBackup()
+        warn("primary failed:", err)
+        return fetchBackup()
     end)
 ```
 
----
+### Debugging
 
-### Side Effects (Debugging)
-
-#### `:inspect(fn)`
-Executes a side effect on the success value without modifying the Result. Useful for logging.
-
+**`:inspect(fn)`** - peek at success value (for logging)
 ```luau
-result
-    :inspect(function(value) print("Got value:", value) end)
-    :map(processValue)
+result:inspect(function(v) print("got:", v) end)
 ```
 
-#### `:inspectErr(fn)`
-Executes a side effect on the error value without modifying the Result.
+**`:inspectErr(fn)`** - peek at error value
 
-```luau
-result
-    :inspectErr(function(err) warn("Error:", err) end)
-    :orElse(recover)
-```
+### Logic
 
----
+**`:and_(other)`** - returns other if self is Ok
+**`:or_(other)`** - returns other if self is Err
 
-### Logical Operations
+### Promise-ish
 
-#### `:and_(other)`
-Returns the other Result if this one is `Ok`, otherwise returns self (`Err`).
-
-```luau
-local both = resultA:and_(resultB)
--- Returns resultB if resultA is Ok, otherwise returns resultA
-```
-
-#### `:or_(other)`
-Returns self if `Ok`, otherwise returns the other Result.
-
-```luau
-local either = resultA:or_(resultB)
--- Returns resultA if Ok, otherwise returns resultB
-```
-
----
-
-### Promise Compatibility
-
-#### `:asPromise()`
-Converts the Result to a Promise-like interface for compatibility.
-
+**`:asPromise()`** - if you want that interface
 ```luau
 result:asPromise()
-    :andThen(function(value)
-        return value * 2
-    end)
-    :catch(function(err)
-        warn("Error:", err)
-        return 0
-    end)
+    :andThen(function(v) return v * 2 end)
+    :catch(function(e) return 0 end)
 ```
 
----
-
-## 💡 Examples
-
-### Safe Data Loading
+## Real Example
 
 ```luau
 local function loadPlayerData(player)
-    return Resulty.tryWith("Loading " .. player.Name, function()
+    return Resulty.tryWith("loading " .. player.Name, function()
         return DataStore:GetAsync(player.UserId)
     end)
     :andThen(function(data)
         return Resulty.validate(data, function(d)
             return d ~= nil and d.version ~= nil
-        end, "Invalid data format")
+        end, "bad data format")
     end)
-    :map(function(data)
-        return migrateData(data)
-    end)
+    :map(migrateData)
 end
 
 loadPlayerData(player):match({
-    Ok = function(data)
-        applyData(player, data)
-    end,
+    Ok = function(data) applyData(player, data) end,
     Err = function(err)
         warn(err)
-        applyDefaultData(player)
+        applyDefaults(player)
     end,
 })
 ```
 
-### Chaining Multiple Operations
+## License
 
-```luau
-local result = Resulty.Ok(rawInput)
-    :map(sanitize)
-    :filter(isValidFormat, "Invalid format")
-    :andThen(function(input)
-        return Resulty.try(function()
-            return parseJson(input)
-        end)
-    end)
-    :inspect(function(parsed)
-        print("Successfully parsed:", parsed)
-    end)
-    :unwrapOr({})
-```
+MIT
 
-### Error Recovery
-
-```luau
-local config = Resulty.try(loadFromFile)
-    :orElse(function()
-        return Resulty.try(loadFromNetwork)
-    end)
-    :orElse(function()
-        return Resulty.Ok(DEFAULT_CONFIG)
-    end)
-    :unwrap()
-```
-
----
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) for details.
-
----
-
-## 👤 Author
-**yooo_**
-**YoheiKung** (Roblox)  
-**yohei_yayoi** (Discord, GitHub)
+## Author
+yooo_ / YoheiKung (Roblox) / yohei_yayoi (Discord, GitHub)
