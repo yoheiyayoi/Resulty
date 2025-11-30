@@ -2,6 +2,9 @@
 
 Rust-style Result type for Luau. No more `pcall` spaghetti.
 
+> [!WARNING]
+> This library is still in beta, so I don’t fully recommend using it in production yet.
+
 ## Why?
 
 Ever get tired of writing this?
@@ -25,7 +28,7 @@ Yeah, me too. This gives you proper error handling that you can actually chain t
 **Wally:**
 ```toml
 [dependencies]
-Resulty = "yohei_yayoi/resulty@1.0.0"
+Resulty = "yoheiyayoi/resulty@1.0.1"
 ```
 
 Or just grab `src/init.luau` and drop it in your project.
